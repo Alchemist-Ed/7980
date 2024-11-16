@@ -70,45 +70,67 @@ def testing(epoch, model, data, metrics_dict):
         model.cuda()
     model.eval()
     update = False
-    for state in states:
-        if state == 'meta_training':
-            continue
-        loss, mae, rmse, ndcg_at_5 = [], [], [], []
-        test_data = data.get_batch(state, -1, True)
-        for j in range(len(test_data['supp_xs'])):  # each task
-            task_data = {'supp_x': test_data['supp_xs'][j],
-                         'supp_y': test_data['supp_ys'][j],
-                         'query_x': test_data['query_xs'][j],
-                         'query_y': test_data['query_ys'][j],
-                         'task_self': test_data['task_self_s'][j],
-                         'task_social': test_data['task_social_s'][j],
-                         'task_implicit': test_data['task_implicit_s'][j],
-                         'task_coclick': test_data['task_coclick_s'][j]}
-            _loss, _mae, _rmse, _ndcg_5 = model.evaluation(task_data)
-            loss.append(_loss)
-            mae.append(_mae)
-            rmse.append(_rmse)
-            ndcg_at_5.append(_ndcg_5)
-        loss_ = torch.stack(loss).mean(0)
-        loss_ = loss_.cpu().data.numpy()
-        mae_mean = np.mean(mae)
-        rmse_mean = np.mean(rmse)
-        ndcg_mean = np.mean(ndcg_at_5)
-        model.writer.add_scalar('epoch_test_%s_loss' % state, loss_, global_step=epoch)
-        model.writer.add_scalar('epoch_test_%s_mae' % state, mae_mean, global_step=epoch)
-        model.writer.add_scalar('epoch_test_%s_rmse' % state, rmse_mean, global_step=epoch)
-        model.writer.add_scalar('epoch_test_%s_ndcg_at_5' % state, ndcg_mean, global_step=epoch)
-        output_to_file('{}: state: {}; loss: {:.5f},mae: {:.5f}, rmse: {:.5f}, ndcg@5: {:.5f}'.
-                       format(get_current_time(), state, loss_, mae_mean, rmse_mean, ndcg_mean), log_file)
-        if mae_mean < metrics_dict[state][0]:
-            metrics_dict[state][0] = mae_mean
-            update = True
-        if rmse_mean < metrics_dict[state][1]:
-            metrics_dict[state][1] = rmse_mean
-            update = True
-        if ndcg_mean > metrics_dict[state][2]:
-            metrics_dict[state][2] = ndcg_mean
-            update = True
+    # start modifying
+    output_dir = config.get("output_dir", "output")
+    scores_res_dir = os.path.join(output_dir, 'scores_res')
+    os.makedirs(scores_res_dir, exist_ok=True)
+
+    # Specify the file path for this epoch's results
+    file_path = os.path.join(scores_res_dir, f'user_scores_epoch_{epoch}.txt')
+    
+    with open(file_path, 'w') as result_file:
+        for state in states:
+            if state == 'meta_training':
+                continue
+            loss, mae, rmse, ndcg_at_5 = [], [], [], []
+            test_data = data.get_batch(state, -1, True)
+            
+            for j in range(len(test_data['supp_xs'])):  # each task
+                user_id = test_data['supp_xs'][j][0][0].item()
+                task_data = {'supp_x': test_data['supp_xs'][j],
+                            'supp_y': test_data['supp_ys'][j],
+                            'query_x': test_data['query_xs'][j],
+                            'query_y': test_data['query_ys'][j],
+                            'task_self': test_data['task_self_s'][j],
+                            'task_social': test_data['task_social_s'][j],
+                            'task_implicit': test_data['task_implicit_s'][j],
+                            'task_coclick': test_data['task_coclick_s'][j]}
+                
+                _loss, _mae, _rmse, (ndcg_5, real_score, pred_score) = model.evaluation(task_data)
+                if state == "user_cold_testing":
+                    user_result={"user_id":user_id,
+                                "real_score":real_score.tolist(),
+                                "pred_score":pred_score.tolist(),
+                                "rmse":_rmse,
+                                "ndcg@5":ndcg_5
+                    }
+                    result_file.write(json.dumps(user_result) + '\n')
+                    
+                loss.append(_loss)
+                mae.append(_mae)
+                rmse.append(_rmse)
+                ndcg_at_5.append(ndcg_5)
+           #end modifying      
+            loss_ = torch.stack(loss).mean(0)
+            loss_ = loss_.cpu().data.numpy()
+            mae_mean = np.mean(mae)
+            rmse_mean = np.mean(rmse)
+            ndcg_mean = np.mean(ndcg_at_5)
+            model.writer.add_scalar('epoch_test_%s_loss' % state, loss_, global_step=epoch)
+            model.writer.add_scalar('epoch_test_%s_mae' % state, mae_mean, global_step=epoch)
+            model.writer.add_scalar('epoch_test_%s_rmse' % state, rmse_mean, global_step=epoch)
+            model.writer.add_scalar('epoch_test_%s_ndcg_at_5' % state, ndcg_mean, global_step=epoch)
+            output_to_file('{}: state: {}; loss: {:.5f},mae: {:.5f}, rmse: {:.5f}, ndcg@5: {:.5f}'.
+                        format(get_current_time(), state, loss_, mae_mean, rmse_mean, ndcg_mean), log_file)
+            if mae_mean < metrics_dict[state][0]:
+                metrics_dict[state][0] = mae_mean
+                update = True
+            if rmse_mean < metrics_dict[state][1]:
+                metrics_dict[state][1] = rmse_mean
+                update = True
+            if ndcg_mean > metrics_dict[state][2]:
+                metrics_dict[state][2] = ndcg_mean
+                update = True
     return update
 
 

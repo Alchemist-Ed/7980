@@ -178,9 +178,9 @@ class SMR(torch.nn.Module):
         """
         # local_update
         loss = self.local_update(task_data)
-        mae, rmse = self.cal_metrics.prediction(self.query_y_real, self.query_y_pred)
+        mae, rmse = self.cal_metrics.prediction(self.query_y_real, self.query_y_pred) #query_y_real => real score, query_y_pred => pred score
         ndcg_5 = self.cal_metrics.ranking(self.query_y_real, self.query_y_pred, k=5)
-        return loss, mae, rmse, ndcg_5
+        return loss, mae, rmse, (ndcg_5, self.query_y_real, self.query_y_pred) #modify
 
     def get_user_sim_scores(self, user_x, user_mask, other_x, other_mask):
         """
