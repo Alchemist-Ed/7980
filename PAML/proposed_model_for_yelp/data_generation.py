@@ -70,8 +70,8 @@ def find_other_iids(iid, iid_fid_dict, fid_iid_dict):
 
 # calculate similarity between two users based on their common friends
 def get_friends_similarity(uid1, uid2, dataset):
-    uid1_friends = set(dataset.user_friends[uid1])
-    uid2_friends = set(dataset.user_friends[uid2])
+    uid1_friends = set(dataset[uid1])
+    uid2_friends = set(dataset[uid2])
     common_friends = len(uid1_friends & uid2_friends)
     total_fruiends = len(uid1_friends) + len(uid2_friends)
     if total_fruiends == 0:
@@ -282,7 +282,7 @@ def get_task_tensor(uid_list, feats_list, labels_list, all_label_list):
     return feat_tensor, feat_mask_tensor
 
 
-def get_training_samples(dataset_path, user2id, item2id, user_feature, item_feature, output_dir, **kwargs):
+def get_training_samples(dataset_path, user2id, item2id, user_feature, item_feature, output_dir, user_groups_list, **kwargs):
     """
     :param dataset_path:
     :param user2id:
@@ -380,21 +380,25 @@ def get_training_samples(dataset_path, user2id, item2id, user_feature, item_feat
             self_feat_tensor, self_feat_mask_tensor = get_task_tensor([uid], [feat_list], [sup_y], all_label_list)
             
             neighbor_list = uidNeigh2id[uid]
-            neighbor_feat_list, neighbor_label_list = [], []
+            neighbor_feat_list, neighbor_label_list, valid_neighbors_list = [], [], []
+
             for neighbor in neighbor_list:
-    
                 if neighbor not in meta_training_feat_dict:
                     print(f"Neighbor {neighbor} not found in meta_training_feat_dict, skipping.")
                     continue
                 neighbor_feat_list.append(meta_training_feat_dict[neighbor][0])
                 neighbor_label_list.append(meta_training_feat_dict[neighbor][1])
-            if len(neighbor_list) != len(neighbor_feat_list):
-                neighbor_list = neighbor_list[:len(neighbor_feat_list)]
+                ## Modify
+                valid_neighbors_list.append(neighbor)
+
+           # Modify
+           # if len(neighbor_list) != len(neighbor_feat_list):
+           #     neighbor_list = neighbor_list[:len(neighbor_feat_list)]
                 
-            neighbor_feat_tensor, neighbor_feat_mask_tensor = get_task_tensor(neighbor_list, neighbor_feat_list, neighbor_label_list, all_label_list)
+            neighbor_feat_tensor, neighbor_feat_mask_tensor = get_task_tensor(valid_neighbors_list, neighbor_feat_list, neighbor_label_list, all_label_list)
 
             coclick_list = get_coclick_neighbor(iid_arr, uid_iids_map, iid_uids_map, kwargs['implicit_num'])
-            coclick_feat_list, coclick_label_list = [], []
+            coclick_feat_list, coclick_label_list, valid_coclicks = [], [], []
           
 
             for coclick in coclick_list:
@@ -402,13 +406,16 @@ def get_training_samples(dataset_path, user2id, item2id, user_feature, item_feat
                     continue
                 coclick_feat_list.append(meta_training_feat_dict[coclick][0])
                 coclick_label_list.append(meta_training_feat_dict[coclick][1])
+                ## Modify
+                valid_coclicks.append(coclick)
+            ## Modifying
             
-            if len(coclick_list) != len(coclick_feat_list) or len(coclick_list) != len(coclick_label_list):
-                return
+            #if len(coclick_list) != len(coclick_feat_list) or len(coclick_list) != len(coclick_label_list):
+                #return
 
-            coclick_feat_tensor, coclick_feat_mask_tensor = get_task_tensor(coclick_list, coclick_feat_list, coclick_label_list, all_label_list)
+            coclick_feat_tensor, coclick_feat_mask_tensor = get_task_tensor(valid_coclicks, coclick_feat_list, coclick_label_list, all_label_list)
+            imp_neighbor = get_implicit_neighbor_for_single(uid, rate_uid_iid_dict, rate_iid_uid_dict, feat_iid_fid_dict, feat_fid_iid_dict, user_groups_list)
 
-            imp_neighbor = get_implicit_neighbor_for_single(uid, rate_uid_iid_dict, rate_iid_uid_dict, feat_iid_fid_dict, feat_fid_iid_dict)
             idx = 0
             implicit_list = []
             implicit_feat_list, implicit_label_list = [], []
@@ -440,8 +447,8 @@ def process(data_set, item_feat_list, implicit_num):
     :param implicit_num: 
     :return:
     """
-    dataset_path = "data/"
-    output_dir = "data_process/"
+    dataset_path = "PAML/proposed_model_for_yelp/data/"
+    output_dir = "PAML/proposed_model_for_yelp/data_process/"
     if data_set == 'dbook':
         dataset_path += 'dbook'
         output_dir += 'dbook'
@@ -484,7 +491,8 @@ def process(data_set, item_feat_list, implicit_num):
                   'uidNeigh2id': uidNeigh2id,
                   'rating_list': dataset.rating_list,
                   'item_feat_list_for_graph': item_feat_list,
-                  'implicit_num': implicit_num}
+                  'implicit_num': implicit_num,
+                  'user_groups_list':dataset.user_friends}
     get_training_samples(dataset_path, user2id, item2id, user_feature, item_feature, output_dir, **other_data)
 
 

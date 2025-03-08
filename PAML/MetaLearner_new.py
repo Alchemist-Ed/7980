@@ -55,6 +55,7 @@ class MetaLearner(torch.nn.Module):
         x_social = preference[1].repeat(x_i.shape[0], 1)
         x = torch.cat((x_i, x_self, x_social), 1)
 
+        ## 此处的基础模型是全连接神经网络
         x = F.relu(F.linear(x, vars_dict['ml_fc_w1'], vars_dict['ml_fc_b1']))
         x = F.dropout(x, training=self.training, p=self.dropout)
         x = F.relu(F.linear(x, vars_dict['ml_fc_w2'], vars_dict['ml_fc_b2']))
@@ -195,7 +196,10 @@ class SocialEncoder(torch.nn.Module):
         return users_items_agg
 
     def get_initialed_para_matrix(self, out_num, in_num):
-        w = torch.nn.Parameter(torch.ones([out_num, in_num]))
+        # original
+        #w = torch.nn.Parameter(torch.ones([out_num, in_num]))
+        #modified
+        w = torch.nn.Parameter(torch.rand([out_num, in_num]))
         torch.nn.init.xavier_normal_(w)
         return w
 

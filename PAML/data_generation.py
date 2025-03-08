@@ -38,8 +38,21 @@ def get_coclick_neighbor(iids, uid_iids_map, iid_uids_map, max_num):
     for iid in iids:
         candidate_uids.update(iid_uids_map[iid])
     for uid in candidate_uids:
+        #################################################
+        ## Modified By LPZ
+        ## Redefine how to measure similarity between users
+
+
         nume = iids.intersection(uid_iids_map[uid])
-        similarity = len(nume) / len(iids)
+        ##similarity = len(nume) / len(iids)
+        
+        ##self_similarity = len(nume) / len(iids)
+        ##neighbor_similarity = len(nume) / len(uid_iids_map[uid])
+        ##similarity = (self_similarity + neighbor_similarity) / 2 
+        
+        uni = iids.union(uid_iids_map[uid])
+        similarity = len(nume) / len(uni)
+        ################################################
         coclick_neighbor_list.append((similarity, uid))
     coclick_neighbor_list.sort(key=lambda x: -x[0])
     coclick_neighbor_list = [uid for sim, uid in coclick_neighbor_list[:max_num]]
@@ -120,7 +133,12 @@ def get_implicit_neighbor_for_single(uid, rate_uid_iid_dict, rate_iid_uid_dict, 
     for rate, uid_iid_dict in rate_uid_iid_dict.items():
         if uid not in uid_iid_dict:
             continue
-        prob_uid_iid = 1. / len(uid_iid_dict[uid])
+        #################################################
+        ### Modify
+        ##prob_uid_iid = 1. / len(uid_iid_dict[uid])
+        prob_uid_iid = rate / len(uid_iid_dict[uid])
+        ###
+        ################################################
         for iid in uid_iid_dict[uid]:
             uid_prob = find_other_uids(uid, iid, rate_iid_uid_dict[rate])
             for k, v in uid_prob.items():
@@ -134,9 +152,10 @@ def get_implicit_neighbor_for_single(uid, rate_uid_iid_dict, rate_iid_uid_dict, 
                     uid_prob = find_other_uids(uid, s_iid, rate_iid_uid_dict[rate])
                     for k, v in uid_prob.items():
                         #modify
-                        power_weight = get_group_similarity(uid, k, user_groups_list)
+                        ## power_weight = get_group_similarity(uid, k, user_groups_list)
                         # suid_prob[k] += prob_uid_iid * s_prob * v * power_weight
-                        suid_prob[k] += prob_uid_iid * s_prob * v + power_weight
+                        ## suid_prob[k] += prob_uid_iid * s_prob * v + power_weight
+                        suid_prob[k] += prob_uid_iid * s_prob * v * rate
             
                         #end modify
     imp_neighbor_score = [(k, v) for k, v in suid_prob.items()]
@@ -220,11 +239,16 @@ def get_index_mapping(dataset, output_dir):
         for feat in features:
             itemFeat2id[feat_name][feat] = len(itemFeat2id[feat_name])
     print("num_user: %s" % len(user2id))
+    ## num_user: 10592
     print("num_item: %s" % len(item2id))
+    ## num_item: 21651
     for feat_name, items in userFeat2id.items():
         print("num_%s: %s" % (feat_name, len(items)))
+        ## num_location: 453
     for feat_name, items in itemFeat2id.items():
         print("num_%s: %s" % (feat_name, len(items)))
+        ## num_author: 10713
+        ## num_publisher: 1789
     pickle.dump(user2id, open("{}/user2id.pkl".format(output_dir), "wb"))
     pickle.dump(item2id, open("{}/item2id.pkl".format(output_dir), "wb"))
     pickle.dump(userFeat2id, open("{}/userFeat2id.pkl".format(output_dir), "wb"))

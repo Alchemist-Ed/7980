@@ -11,10 +11,19 @@ import numpy as np
 import torch
 import json
 from SMR import SMR
+from learner_model import Learner
+from IM import IM
+from MAML import MAML
+from MAML import EarlyStopping
 from DataHelper import DataHelper
 from tqdm import tqdm
 from Config import states
 from util import *
+
+import torch.nn.functional as F
+from torchvision import transforms
+
+import matplotlib.pyplot as plt
 
 random.seed(13)
 np.random.seed(13)
@@ -26,16 +35,17 @@ def training(model, model_save, model_file_path, data):
     if config['use_cuda']:
         model.cuda()
     model.train()
-
+    loss_hist = []
+    ndcg_hist = []
     batch_size = config['batch_size']
     num_epoch = config['num_epoch']
     train_data = data.data['meta_training']
     max_metrics = dict()
     metrics_name = ['mae', 'rmse', 'ndcg@5']
+    early_stopping = EarlyStopping(patience=config['patience'], min_delta=config['min_delta'])
     for state in states:
         if state != 'meta_training':
             max_metrics[state] = [100., 100., 0]
-
     for epoch in range(num_epoch):
         loss = []
         start = time.time()
@@ -46,14 +56,19 @@ def training(model, model_save, model_file_path, data):
             batch_data = data.get_batch('meta_training', k)
             global_step = epoch * num_batch + k
             _loss = model.global_update(global_step, batch_data)
+            #array(17.638226, dtype=float32)
             loss.append(_loss)
         # model.print_time()
+        early_stopping(np.mean(loss))
+        if early_stopping.early_stop:
+            print('Early stopping triggered')
+            #break
         output_to_file('{}: epoch: {}, loss: {:.6f}, cost time: {:.1f}s'.
                        format(get_current_time(), epoch, np.mean(loss), time.time() - start), log_file)
         model.writer.add_scalar('epoch_train_loss', np.mean(loss), global_step=epoch)
         #if epoch < 80 and epoch % 10 != 0:
             #continue
-        metrics_update = testing(epoch, model, data, max_metrics)
+        metrics_update = testing(epoch, model, data, max_metrics, loss_hist, ndcg_hist)
         model.train()
 
         if model_save and metrics_update:
@@ -64,8 +79,19 @@ def training(model, model_save, model_file_path, data):
             model_file = os.path.join(model_file_path, 'model_%s' % epoch)
             torch.save(model.state_dict(), model_file)
 
+    epochs = range(1, len(loss_hist) + 1)
+    plt.figure(figsize=(16,10))
+    plt.plot(epochs, loss_hist, marker='o', linestyle='-', color='b', label='Loss')
+    plt.plot(epochs, ndcg_hist, marker='s', linestyle='-', color='r', label='NDCG@5')
 
-def testing(epoch, model, data, metrics_dict):
+    plt.title('Training Loss V.S NDCG@5')
+    plt.xlabel('Epochs', fontsize=14)
+    plt.ylabel('Loss', fontsize=14)
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.legend()
+    plt.show()
+
+def testing(epoch, model, data, metrics_dict, loss_hist, ndcg_hist):
     if config['use_cuda']:
         model.cuda()
     model.eval()
@@ -97,6 +123,8 @@ def testing(epoch, model, data, metrics_dict):
                             'task_coclick': test_data['task_coclick_s'][j]}
                 
                 _loss, _mae, _rmse, (ndcg_5, real_score, pred_score) = model.evaluation(task_data)
+                #_loss tensor(17.9408, grad_fn=<MseLossBackward0>)
+                #_mae 4.398346
                 if state == "user_cold_testing":
                     user_result={"user_id":user_id,
                                 "real_score":real_score.tolist(),
@@ -122,6 +150,10 @@ def testing(epoch, model, data, metrics_dict):
             model.writer.add_scalar('epoch_test_%s_ndcg_at_5' % state, ndcg_mean, global_step=epoch)
             output_to_file('{}: state: {}; loss: {:.5f},mae: {:.5f}, rmse: {:.5f}, ndcg@5: {:.5f}'.
                         format(get_current_time(), state, loss_, mae_mean, rmse_mean, ndcg_mean), log_file)
+            
+            loss_hist.append(loss_)
+            ndcg_hist.append(ndcg_mean)
+
             if mae_mean < metrics_dict[state][0]:
                 metrics_dict[state][0] = mae_mean
                 update = True
@@ -135,13 +167,14 @@ def testing(epoch, model, data, metrics_dict):
 
 
 if __name__ == "__main__":
-    data_set = 'dbook'
-    # data_set = 'yelp'
+    #data_set = 'dbook'
+    data_set = 'yelp'
 
     load_model = False
 
     if data_set == 'dbook':
         from Config import config_db as config
+        
     elif data_set == 'yelp':
         from Config import config_yelp as config
     if not os.path.exists(config['output_dir']):
@@ -162,6 +195,9 @@ if __name__ == "__main__":
 
     # training model.
     model = SMR(config)
+    #model = Learner(config)
+    #model = IM(config)
+    #model = MAML(config)
 
     if not load_model:
         training(model, model_save=True, model_file_path=model_filepath, data=datasets)

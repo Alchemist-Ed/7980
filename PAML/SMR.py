@@ -41,7 +41,7 @@ class SMR(torch.nn.Module):
         self.ml_weight_size = self.meta_learner.get_parameter_size()
         self.task_specific = Task_specific(config, self.ml_weight_size)
         # global update
-        self.meta_optimizer = torch.optim.Adam(self.parameters(), lr=config['lr'], weight_decay=config['weight_decay'])
+        self.meta_optimizer = torch.optim.Adam(self.parameters(), lr=config['outer_lr'], weight_decay=config['weight_decay'])
         self.time_spend = {}
 
     def reset_time(self):
@@ -198,4 +198,3 @@ class SMR(torch.nn.Module):
 
         sim_scores = torch.mm(user_preference, other_preference.transpose(0, 1))
         return sim_scores.data.cpu().numpy()
-

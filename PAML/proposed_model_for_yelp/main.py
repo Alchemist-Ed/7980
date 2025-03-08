@@ -26,7 +26,8 @@ def training(model, model_save, model_file_path, data):
     if config['use_cuda']:
         model.cuda()
     model.train()
-
+    loss_hist = []
+    ndcg_hist = []
     batch_size = config['batch_size']
     num_epoch = config['num_epoch']
     train_data = data.data['meta_training']
@@ -53,7 +54,7 @@ def training(model, model_save, model_file_path, data):
         model.writer.add_scalar('epoch_train_loss', np.mean(loss), global_step=epoch)
         #if epoch < 80 and epoch % 10 != 0:
             #continue
-        metrics_update = testing(epoch, model, data, max_metrics)
+        metrics_update = testing(epoch, model, data, max_metrics, loss_hist, ndcg_hist)
         model.train()
 
         if model_save and metrics_update:
@@ -64,8 +65,19 @@ def training(model, model_save, model_file_path, data):
             model_file = os.path.join(model_file_path, 'model_%s' % epoch)
             torch.save(model.state_dict(), model_file)
 
+    epochs = range(1, len(loss_hist) + 1)
+    plt.figure(figsize=(16,10))
+    plt.plot(epochs, loss_hist, marker='o', linestyle='-', color='b', label='Loss')
+    plt.plot(epochs, ndcg_hist, marker='s', linestyle='-', color='r', label='NDCG@5')
 
-def testing(epoch, model, data, metrics_dict):
+    plt.title('Training Loss V.S NDCG@5')
+    plt.xlabel('Epochs', fontsize=14)
+    plt.ylabel('Loss', fontsize=14)
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.legend()
+    plt.show()
+
+def testing(epoch, model, data, metrics_dict, loss_hist, ndcg_hist):
     if config['use_cuda']:
         model.cuda()
     model.eval()
@@ -102,6 +114,10 @@ def testing(epoch, model, data, metrics_dict):
         model.writer.add_scalar('epoch_test_%s_ndcg_at_5' % state, ndcg_mean, global_step=epoch)
         output_to_file('{}: state: {}; loss: {:.5f},mae: {:.5f}, rmse: {:.5f}, ndcg@5: {:.5f}'.
                        format(get_current_time(), state, loss_, mae_mean, rmse_mean, ndcg_mean), log_file)
+        
+        loss_hist.append(loss_)
+        ndcg_hist.append(ndcg_mean)
+
         if mae_mean < metrics_dict[state][0]:
             metrics_dict[state][0] = mae_mean
             update = True

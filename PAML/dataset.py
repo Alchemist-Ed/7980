@@ -147,12 +147,14 @@ class yelp(object):
                 user1 = int(data[0])
                 #modify
                 # user2s = list(map(int, data[1].split())) 
-                user2s = list(map(int, data[1].split(',')))
+                # user2s = list(map(int, data[1].split(',')))
+                data_entry = data[1]
+                user2s = [int(num) for num in data_entry.split() if num.isdigit()]
                 # end modify
                 user_neighbor[user1] = user2s
         return user_neighbor
 
 
 if __name__ == '__main__':
-    # dbook()
+    #dbook()
     yelp()

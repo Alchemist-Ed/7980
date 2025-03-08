@@ -57,7 +57,7 @@ class yelp(object):
         self.user_neighbor = self.get_neighbor()
 
     def load(self):
-        input_dir = "data/yelp/original/"
+        input_dir = "PAML/proposed_model_for_yelp/data/yelp/original/"
         # input_dir = "/Users/lujiewen/Desktop/papers/datasets/sampled/"
 
         rating_data = pd.read_csv(input_dir + 'rating.dat', names=['user', 'item', 'rating', 'time'], sep='\t', engine='python')
@@ -90,7 +90,7 @@ class yelp(object):
 
     def get_neighbor(self):
         user_neighbor = dict()
-        with open("data/yelp/original/user_friends.dat") as fin:
+        with open("PAML/proposed_model_for_yelp/data/yelp/original/user_friends.dat") as fin:
             for line in fin:
                 data = line.strip().split('\t')
                 if len(data) != 2:

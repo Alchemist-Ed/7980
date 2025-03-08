@@ -117,7 +117,7 @@ config_yelp = {
     'weight_decay': 3e-3,
     'batch_size': 64,  # for each batch, the number of tasks
     # 'num_epoch': 170,
-    'num_epoch': 129,
+    'num_epoch': 20,
    
 
     # option
